@@ -13,11 +13,11 @@ let scrape = async (id, i) => {
   console.log("CURRENT EL ", i);
 
   const browser = await puppeteer.launch({
-    args: [`--proxy-server=${ROUTER_PROXY}`]
+    // args: [`--proxy-server=${ROUTER_PROXY}`]
   });
   
   const page = await browser.newPage();
-  page.setUserAgent(uas[0]);
+  // page.setUserAgent(uas[0]);
   const link = "https://www.facebook.com/" + id;  
 
   await page.goto(link);
@@ -593,10 +593,10 @@ const proxies = ["http://138.68.245.7:8080", "http://66.29.98.248:8080", "http:/
 const calculateResult = async (err, content) => {
   if (err) throw new Error(err);
 
-  const proxyServer = new proxy();
-  console.log(proxyServer)
-  proxyServer.init(proxies);
-  await proxyServer.start();
+  // const proxyServer = new proxy();
+  // console.log(proxyServer)
+  // proxyServer.init(proxies);
+  // await proxyServer.start();
 
   const idsArray = content.split(/\n/g).map(x => x.trim());
   const errorsArray = [];
@@ -606,7 +606,7 @@ const calculateResult = async (err, content) => {
     
     const scrapeResult = await scrape(idsArray[i], i).catch( async () => {
       errorsArray.push(idsArray[i])
-      await proxyServer.changeProxy();
+      // await proxyServer.changeProxy();
     });
     await new Promise((res, rej) => {
       if (rej) console.log(err);
@@ -620,7 +620,7 @@ const calculateResult = async (err, content) => {
   }
 };
 
-fs.readFile("idOfNumberErrors.txt", "utf8", calculateResult);
+fs.readFile("all_fb_ids.txt", "utf8", calculateResult);
 
 
 
