@@ -1,6 +1,10 @@
 const puppeteer = require("puppeteer");
 const fs = require("fs");
-const proxy = require('./proxyServer.js');
+const proxy = require("./proxyServer.js");
+// const addToCollection = require('./mongoConnection.js');
+const collectionServ = require("./putProxyintoBase.js");
+
+// const fetchProxy = require('fakeFetch.js');
 
 const ROUTER_PROXY = "http://127.0.0.1:8000";
 
@@ -10,15 +14,16 @@ const uas = [
 ];
 
 let scrape = async (id, i) => {
-  console.log("CURRENT EL ", i);
+  console.log("CURRENT EL ", id);
 
   const browser = await puppeteer.launch({
-    // args: [`--proxy-server=${ROUTER_PROXY}`]
+    args: [`--proxy-server=${ROUTER_PROXY}`],
+    headless: false
   });
-  
+
   const page = await browser.newPage();
-  // page.setUserAgent(uas[0]);
-  const link = "https://www.facebook.com/" + id;  
+  page.setUserAgent(uas[0]);
+  const link = "https://www.facebook.com/" + id;
 
   await page.goto(link);
   await page.setViewport({ width: 1000, height: 1000 });
@@ -582,77 +587,45 @@ let scrape = async (id, i) => {
   }
 };
 
-// scrape(222721924762796).then((value) => {
-//   console.log(value);
-//   fs.writeFile('11111.txt', JSON.stringify(value),() => console.log());
-// });
+const restCollection = "Rests";
+const proxyCollection = "ProxyList";
 
+const calculateResult = async () => {
+  const proxyServer = new proxy();
+  await proxyServer.create();
+  await proxyServer.start();
 
-const proxies = ["http://138.68.245.7:8080", "http://66.29.98.248:8080", "http://204.52.206.65:8080", "http://66.60.120.162:8080", "http://104.236.48.178:8080", "http://38.127.88.19:53281"];
-
-const calculateResult = async (err, content) => {
-  if (err) throw new Error(err);
-
-  // const proxyServer = new proxy();
-  // console.log(proxyServer)
-  // proxyServer.init(proxies);
-  // await proxyServer.start();
-
-  const idsArray = content.split(/\n/g).map(x => x.trim());
-  const errorsArray = [];
-  const result = [];
-
-  for (let i = 0; i < idsArray.length; i++) {
-    
-    const scrapeResult = await scrape(idsArray[i], i).catch( async () => {
-      errorsArray.push(idsArray[i])
-      // await proxyServer.changeProxy();
+  let currentRest = await collectionServ.getFromCollection(restCollection);
+  console.log("CURRENT REST", currentRest);
+  while (currentRest) {
+    const scrapeResult = await scrape(currentRest.rest).catch(async () => {
+      console.log("INVALID REST");
+      await collectionServ.addToCollection("Errors")([
+        { rest: currentRest.rest }
+      ]);
+      await proxyServer.changeProxy();
     });
+
     await new Promise((res, rej) => {
-      if (rej) console.log(err);
-      setTimeout(res, 0);
+      setTimeout(res, 1000);
     });
-    result.push(scrapeResult);
-    console.log(scrapeResult);
-    fs.writeFile("errorsNumResult.txt", JSON.stringify(result), () =>
-      console.log()
-    );
+
+    if (!scrapeResult) {
+      console.log("SCRAPE RES is", scrapeResult);
+      await collectionServ.addToCollection("Errors")([
+        { rest: currentRest.rest }
+      ]);
+      await proxyServer.changeProxy();
+    } else {
+      await collectionServ.addToCollection("Results")([scrapeResult]);
+    }
+    currentRest = null;
+    currentRest = await collectionServ.getFromCollection(restCollection);
+    console.log("CURRENT REST", currentRest);
+    // promisifyWrite(scrapeResult, "resultWithProxy.txt");
   }
 };
 
-fs.readFile("all_fb_ids.txt", "utf8", calculateResult);
+calculateResult();
 
-
-
-
-
-// while(idsList.length  >  0) {
-//     let lastProxyIndex = 0;
-//     while(proxyList.length > 0) {
-      
-//       const proxyServer = new ProxyChain.Server({
-//         port: 8000,
-//         verbose: false,
-//         prepareRequestFunction: ({ request }) => {
-//           let upstreamProxyUrl =  proxies[lastProxyIndex]
-//           // if (request.headers["user-agent"] === uas[0])
-//             upstreamProxyUrl = proxies[0];
-//           return { upstreamProxyUrl };
-//       }
-//     });
-
-//     proxyServer.listen(() => {
-//       console.log(`Router Proxy server is listening on port ${8000}`);
-//     });
-
-//     try {
-//       const scrapeResult = await scrape(idsArray[i], i);
-//       result.push(scrapeResult);
-      
-//     } catch (error) {
-//       errorsArray.push(idsArray[i])
-//       lastProxyIndex++;
-//     }
-
-//     }
-//   }
+// fs.readFile('all_fb_ids.txt','utf8', );

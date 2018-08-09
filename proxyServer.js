@@ -1,50 +1,45 @@
 const ProxyChain = require("proxy-chain");
 
-const kek = proxy => {
-  const proxyServer = new ProxyChain.Server({
-    port: 8000,
-    verbose: false,
-    prepareRequestFunction: ({ request }) => {
-      let upstreamProxyUrl = proxy;
-      return { upstreamProxyUrl };
-    }
-  });
+const getProxy = require('./putProxyintoBase.js');
 
-  proxyServer.listen(() => {
-    console.log(`Router Proxy server is listening on port ${8000}`);
-  });
+// const getResult = async () => {
+//   const proxies = await getProxy.getFromCollection();
+//   console.log(result);
+//   return result;
+// }
 
-  proxyServer.close(true, () => {
-    console.log("Proxy server was closed.");
-  });
+// console.log(getResult())
 
-  return proxyServer;
-};
+const restCollection = "Rests";
+const proxyCollection = "ProxyList";
 
 function Proxy() {
   this.proxyServer = null;
-  this._proxyList = [];
-  this._i = 0;
 
   this.init = function(proxyList) {
     this._proxyList = proxyList;
     this._i = 0;
   };
 
-  this.create = function() {
+  this.create = async function() {
+    const proxy = await getProxy.getFromCollection(proxyCollection);
+
+    console.log("CURRENt PROXY", proxy);
     this.proxyServer = new ProxyChain.Server({
       port: 8000,
       verbose: false,
       prepareRequestFunction: ({ request }) => ({
-        upstreamProxyUrl: this._proxyList[this._i]
+        upstreamProxyUrl: "24.52.153.120:53281"
       })
     });
-    this._i++;
     return this;
   };
-  this.start = async function() {
-    if (!this.proxyServer) this.create();
 
+
+  this.start = async function() {
+    if (!this.proxyServer) {
+      await this.create();
+    }
     return new Promise((res, rej) =>
       this.proxyServer.listen(() => {
         console.log(`Router Proxy server is listening on port ${8000}`);
@@ -68,10 +63,12 @@ function Proxy() {
   };
 
   this.changeProxy = async function() {
+    console.log("PROXY HAS CHANGED")
     await this.stop();
-    await this.create();
     await this.start();
   };
 }
 
+// const proxy = new Proxy();
+// proxy.create();
 module.exports = Proxy;
