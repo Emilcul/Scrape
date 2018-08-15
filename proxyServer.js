@@ -3,7 +3,7 @@ const ProxyChain = require("proxy-chain");
 const getProxy = require('./putProxyintoBase.js');
 
 // const getResult = async () => {
-//   const proxies = await getProxy.getFromCollection();
+//   const proxies = await getProxy.getProxyFromCollection();
 //   console.log(result);
 //   return result;
 // }
@@ -22,14 +22,14 @@ function Proxy() {
   };
 
   this.create = async function() {
-    const proxy = await getProxy.getFromCollection(proxyCollection);
+    const proxy = await getProxy.getProxyFromCollection();
 
     console.log("CURRENt PROXY", proxy);
     this.proxyServer = new ProxyChain.Server({
       port: 8000,
       verbose: false,
       prepareRequestFunction: ({ request }) => ({
-        upstreamProxyUrl: "24.52.153.120:53281"
+        upstreamProxyUrl: `http://${proxy.proxy}`
       })
     });
     return this;
@@ -63,6 +63,8 @@ function Proxy() {
   };
 
   this.changeProxy = async function() {
+    // await getProxy.makeProxyCrashed(proxyCollection);
+
     console.log("PROXY HAS CHANGED")
     await this.stop();
     await this.start();

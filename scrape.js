@@ -1,10 +1,10 @@
 const puppeteer = require("puppeteer");
 const fs = require("fs");
 const proxy = require("./proxyServer.js");
-// const addToCollection = require('./mongoConnection.js');
-const collectionServ = require("./putProxyintoBase.js");
 
-// const fetchProxy = require('fakeFetch.js');
+const collectionServ = require("./putProxyintoBase.js");
+const R = require('ramda');
+
 
 const ROUTER_PROXY = "http://127.0.0.1:8000";
 
@@ -18,7 +18,7 @@ let scrape = async (id, i) => {
 
   const browser = await puppeteer.launch({
     args: [`--proxy-server=${ROUTER_PROXY}`],
-    headless: false
+    // headless: false
   });
 
   const page = await browser.newPage();
@@ -90,14 +90,6 @@ let scrape = async (id, i) => {
             ) {
               return document
                 .querySelector("._4bl9._v0m")
-                .getElementsByTagName("a")[1].innerText;
-            } else if (
-              document
-                .querySelectorAll("._4bl9._v0m")[1]
-                .getElementsByTagName("a")[1]
-            ) {
-              return document
-                .querySelectorAll("._4bl9._v0m")[1]
                 .getElementsByTagName("a")[1].innerText;
             }
           } else return "not signed";
@@ -595,37 +587,77 @@ const calculateResult = async () => {
   await proxyServer.create();
   await proxyServer.start();
 
-  let currentRest = await collectionServ.getFromCollection(restCollection);
-  console.log("CURRENT REST", currentRest);
-  while (currentRest) {
-    const scrapeResult = await scrape(currentRest.rest).catch(async () => {
-      console.log("INVALID REST");
-      await collectionServ.addToCollection("Errors")([
-        { rest: currentRest.rest }
-      ]);
-      await proxyServer.changeProxy();
-    });
+  let currentRest = await collectionServ.getRestFromCollection();
 
-    await new Promise((res, rej) => {
-      setTimeout(res, 1000);
-    });
-
-    if (!scrapeResult) {
-      console.log("SCRAPE RES is", scrapeResult);
-      await collectionServ.addToCollection("Errors")([
-        { rest: currentRest.rest }
-      ]);
-      await proxyServer.changeProxy();
-    } else {
-      await collectionServ.addToCollection("Results")([scrapeResult]);
-    }
-    currentRest = null;
-    currentRest = await collectionServ.getFromCollection(restCollection);
-    console.log("CURRENT REST", currentRest);
+  let currentRests = await fetchRests();
+  // console.log("CURRENT REST", currentRest);
+  while (currentRests[0]) {
+    await Promise.all(currentRests.filter(x => x).map(forOneRest))
+      .catch(async (error) => {
+        await proxyServer.changeProxy();
+      })
+    currentRests = await fetchRests();
     // promisifyWrite(scrapeResult, "resultWithProxy.txt");
   }
 };
 
+const checkFetch = async(err,restourant, errorMessage) => {
+  if(restourant.fetchChances > 3) {
+    console.log('EEEERRRRRORRRRR!!!!');
+    await collectionServ.addToCollection("Errors")([
+      // { rest: restourant.rest, error: errorMessage}
+      restourant
+    ]);
+  }else {
+    // console.log('FFFFFFEEEETCHHCHCHHCH!!!!');
+    await collectionServ.addToCollection("Rests")([
+      restourant
+    ]);
+  }
+}
+
+
+const forOneRest = async (restoran) => {
+  // console.log(restoran);
+
+  const scrapeResult = await scrape(restoran.rest).catch(async (err) => {
+    
+    console.log("INVALID REST", err );
+
+    await checkFetch(err,restoran);
+    await proxyServer.changeProxy();
+  });
+
+  if (!scrapeResult) {
+    
+    console.log('!scrapeResult');
+    await checkFetch(restoran, '!scrapeResult');
+
+    await proxyServer.changeProxy();
+
+  } else if(scrapeResult.error == 'security Check'){
+
+    await proxyServer.changeProxy();
+    console.log('security Check');
+    await checkFetch(restoran, 'security Check');
+
+    console.log('Proxy changed after security check')
+    
+  }else {
+    await collectionServ.addToCollection("Results")([scrapeResult]);
+  }
+}
+
+const fetchRests = async () => {
+  const p1 = await collectionServ.getRestFromCollection();
+
+
+  return [p1]
+
+} 
+
 calculateResult();
+
+
 
 // fs.readFile('all_fb_ids.txt','utf8', );
